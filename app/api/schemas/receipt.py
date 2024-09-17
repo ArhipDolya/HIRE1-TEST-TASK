@@ -1,9 +1,12 @@
-from pydantic import BaseModel
-from decimal import Decimal
 from datetime import datetime
+from decimal import Decimal
+from typing import Optional
 
-from app.api.schemas.product import ProductCreate, ProductResponse
+from pydantic import BaseModel, ConfigDict
+
+from app.api.schemas.common import PaymentType
 from app.api.schemas.payment import PaymentCreate, PaymentResponse
+from app.api.schemas.product import ProductCreate, ProductResponse
 
 
 class ReceiptCreate(BaseModel):
@@ -19,5 +22,24 @@ class ReceiptResponse(BaseModel):
     rest: Decimal
     created_at: datetime
 
-    class Config:
-        orm_mode = True
+    model_config = ConfigDict(from_attributes=True)
+
+    @classmethod
+    def from_orm(cls, db_receipt):
+        return cls(
+            id=db_receipt.id,
+            products=[ProductResponse.model_validate(p) for p in db_receipt.products],
+            payment=PaymentResponse(
+                type=db_receipt.payment_type, amount=db_receipt.payment_amount
+            ),
+            total=db_receipt.total,
+            rest=db_receipt.rest,
+            created_at=db_receipt.created_at,
+        )
+
+
+class ReceiptFilter(BaseModel):
+    start_date: Optional[datetime] = None
+    end_date: Optional[datetime] = None
+    min_total: Optional[Decimal] = None
+    payment_type: Optional[PaymentType] = None
